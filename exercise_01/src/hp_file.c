@@ -19,20 +19,20 @@ int HP_CreateFile(char *fileName){
     return 0;
 }
 
-HP_info* HP_OpenFile(char *fileName){
-    return NULL ;
+HP_info* HP_OpenFile(char *fileName, int *file_desc){
+    HP_info* hpInfo;    
+    return hpInfo;
 }
 
 
-int HP_CloseFile( HP_info* hp_info ){
-    return 0;
+int HP_CloseFile(int file_desc,HP_info* hp_info ){
 }
 
-int HP_InsertEntry(HP_info* hp_info, Record record){
-    return 0;
+int HP_InsertEntry(int file_desc,HP_info* hp_info, Record record){
+    return -1;
 }
 
-int HP_GetAllEntries(HP_info* hp_info, int value){
-   return 0;
+int HP_GetAllEntries(int file_desc,HP_info* hp_info, int value){    
+    return -1;
 }
 
