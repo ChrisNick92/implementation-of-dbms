@@ -6,8 +6,33 @@
 
 /* Η δομή HP_info κρατάει μεταδεδομένα που σχετίζονται με το αρχείο σωρού*/
 typedef struct {
-    
+    int total_block_recs;
+    int recorded_blocks;
 } HP_info;
+
+typedef struct { // Block Info is placed at the beginning of the block
+    int number_of_records;
+} HP_block_info;
+
+/* H βοηθητική συνάρτηση HP_AccessBlockInfo γυρνάει έναν δείκτη
+στην αρχή του block που βρίσκονται τα μεταδεδομένα του block και
+είναι τύπου HP_block_info*. */
+
+HP_block_info* HP_AccessBlockInfo(BF_Block *block);
+
+/*Η βοηθητική συνάρτηση HP_GetNextBlockRecord γυρνάει ένα pointer
+τύπου record που δείχνει στην αρχή του που πρέπει να μπει το επόμενο
+record στο block, αν δεν υπάρχει χώρος επιστρέφει NULL */
+
+Record* HP_GetNextBlockRecord(BF_Block *block, HP_info *hpInfo);
+
+/*Η βοηθητική συνάρτηση HP_GetBlockRecord γυρνάει ένα pointer
+τύπου record που δείχνει στη θέση του record που ζητείται από τον
+χρήστη πάνω σε ένα συγκεκριμένο block, αν ζητηθεί record που δεν
+είναι γραμμένο ή ξεπερνάει τα όρια τότε γυρνάει NULL. */
+
+Record *HP_GetBlockRecord(BF_Block *block, int record_num);
+
 
 /*Η συνάρτηση HP_CreateFile χρησιμοποιείται για τη δημιουργία και
 κατάλληλη αρχικοποίηση ενός άδειου αρχείου σωρού με όνομα fileName.
@@ -29,7 +54,6 @@ HP_info* HP_OpenFile(char *fileName,    /* όνομα αρχείου */
                     );
 
 
-
 /* Η συνάρτηση HP_CloseFile κλείνει το αρχείο που προσδιορίζεται
 από το αναγνωριστικό file_desc. Σε περίπτωση που εκτελεστεί επιτυχώς,
 επιστρέφεται 0, ενώ σε διαφορετική περίπτωση -1. Η συνάρτηση είναι
@@ -48,7 +72,7 @@ int HP_CloseFile(int file_desc,         /* προσδιοριστικό ανοί
 επιτυχώς, επιστρέφετε τον αριθμό του block στο οποίο έγινε η εισαγωγή
 (blockId) , ενώ σε διαφορετική περίπτωση -1.
 */
-int HP_InsertEntry(
+BF_ErrorCode HP_InsertEntry(
     int file_desc,
     HP_info* header_info, /* επικεφαλίδα του αρχείου*/
     Record record /* δομή που προσδιορίζει την εγγραφή */ );
