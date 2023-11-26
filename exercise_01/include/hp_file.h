@@ -6,8 +6,8 @@
 
 /* Η δομή HP_info κρατάει μεταδεδομένα που σχετίζονται με το αρχείο σωρού*/
 typedef struct {
-    int total_block_recs;
-    int recorded_blocks;
+    int total_block_recs;               //capacity of 
+    int recorded_blocks;                
 } HP_info;
 
 typedef struct { // Block Info is placed at the beginning of the block
@@ -17,7 +17,7 @@ typedef struct { // Block Info is placed at the beginning of the block
 /* H βοηθητική συνάρτηση HP_AccessBlockInfo γυρνάει έναν δείκτη
 στην αρχή του block που βρίσκονται τα μεταδεδομένα του block και
 είναι τύπου HP_block_info*. */
-
+HP_info* HP_AccessInfo(BF_Block *block);
 HP_block_info* HP_AccessBlockInfo(BF_Block *block);
 
 /*Η βοηθητική συνάρτηση HP_GetNextBlockRecord γυρνάει ένα pointer
@@ -28,7 +28,7 @@ Record* HP_GetNextBlockRecord(BF_Block *block, HP_info *hpInfo);
 
 /*Η βοηθητική συνάρτηση HP_GetBlockRecord γυρνάει ένα pointer
 τύπου record που δείχνει στη θέση του record που ζητείται από τον
-χρήστη πάνω σε ένα συγκεκριμένο block, αν ζητηθεί record που δεν
+χρήστη πάνω σε ένα συγκεκριμένο block. Aν ζητηθεί record που δεν
 είναι γραμμένο ή ξεπερνάει τα όρια τότε γυρνάει NULL. */
 
 Record *HP_GetBlockRecord(BF_Block *block, int record_num);
@@ -72,7 +72,7 @@ int HP_CloseFile(int file_desc,         /* προσδιοριστικό ανοί
 επιτυχώς, επιστρέφετε τον αριθμό του block στο οποίο έγινε η εισαγωγή
 (blockId) , ενώ σε διαφορετική περίπτωση -1.
 */
-BF_ErrorCode HP_InsertEntry(
+int HP_InsertEntry(
     int file_desc,
     HP_info* header_info, /* επικεφαλίδα του αρχείου*/
     Record record /* δομή που προσδιορίζει την εγγραφή */ );
