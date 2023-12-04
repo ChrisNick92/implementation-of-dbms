@@ -65,7 +65,7 @@ int main() {
     BF_Init(LRU);
 
     CALL_OR_DIE(HT_Init());
-
+    HT_FileInfo* p;
     int indexDesc;
     CALL_OR_DIE(HT_CreateIndex(FILE_NAME, GLOBAL_DEPT));
     if ((p = HT_OpenIndex(FILE_NAME, &indexDesc)) == NULL)
