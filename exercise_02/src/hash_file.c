@@ -191,6 +191,18 @@ LList *HT_HashTable_toList(int indexDesc){
     return root;
 }
 
+LList * HT_GetHashTableBlockNum(LList *root, int n){
+    LList *q = root;
+    int i;
+
+    for (i = 0; (q->next != NULL) && i < n; i++)
+        q = q->next;
+    if (i == n)
+        return q;
+    else
+        return NULL; // Not found
+}
+
 /* HASH TABLE UTILS END*/
 
 HT_FileInfo * HT_GetFileInfo(int indexDesc){
@@ -209,6 +221,15 @@ HT_FileInfo * HT_GetFileInfo(int indexDesc){
 
     return p;
 }
+
+HT_ErrorCode HT_GetBlockCounter(const int indexDesc, int *blocks_num){
+    HT_FileInfo *FileInfo;
+    if ((FileInfo = HT_GetFileInfo(indexDesc)) == NULL)
+        return HT_ERROR;
+    
+    return HT_OK;
+}
+
 
 HT_ErrorCode HT_CreateIndex(const char *filename, int depth) {
     int fd;
@@ -235,6 +256,7 @@ HT_ErrorCode HT_CreateIndex(const char *filename, int depth) {
     p->max_nodes_per_block = (BF_BLOCK_SIZE - sizeof(HT_HashNodeInfo)) / sizeof(int);
     p->max_records_per_bucket = (BF_BLOCK_SIZE - sizeof(HT_BucketInfo)) / sizeof(rec);
     p->num_node_blocks = 1;
+    p->num_blocks = 2;
 
     if ((code = BF_AllocateBlock(fd, block)) != BF_OK)
         return HT_ERROR;
@@ -312,9 +334,175 @@ HT_ErrorCode HT_CloseFile(int indexDesc) {
     return HT_OK;
 }
 
-HT_ErrorCode HT_InsertEntry(int indexDesc, Record record) {
-  //insert code here
-  return HT_OK;
+HT_ErrorCode HT_InsertEntry(int indexDesc, LList *HashTable, Record record) {
+    BF_Block *block, *block_0, *new_block;
+    BF_Block_Init(&block);
+    BF_Block_Init(&block_0);
+    BF_Block_Init(&new_block);
+    HT_FileInfo *FileInfo;
+    HT_ErrorCode ht_code;
+    BF_ErrorCode bf_code;
+    int bucket_num;
+    HT_BucketInfo BucketInfo, *pBInfo=&BucketInfo, *new_pBinfo=&BucketInfo;
+    void *data;
+    Record *prec;
+    LList *s;
+    int i, bucket_records;
+
+    if ((bf_code = BF_GetBlock(indexDesc, 0, block_0)) != BF_OK)
+        return HT_ERROR;
+    data = BF_Block_GetData(block_0);
+    FileInfo = data;
+
+    // Determine bucket to insert the new record
+    bucket_num = HT_HashFunc(record.id, FileInfo->global_depth, FileInfo->global_depth);
+    // Find block num and read
+    s = HT_GetHashTableBlockNum(HashTable, bucket_num);
+
+    if (s->block_num == -1){ // No bucket is initialized
+        if ((bf_code = BF_AllocateBlock(indexDesc, block)) != BF_OK)
+            return HT_ERROR;
+        // Write bucket info first
+        data = BF_Block_GetData(block);
+        pBInfo->local_depth = 1;
+        pBInfo->num_records = 1;
+        pBInfo = data;
+        pBInfo[0] = BucketInfo;
+        // Write record
+        data = pBInfo + 1;
+        prec = data;
+        prec[0] = record;
+
+        // Update FileInfo
+        (FileInfo->num_blocks)++;
+        // Update HashTable
+        s->block_num = FileInfo->num_blocks -1;
+        // Set to dirty and Unpin
+        BF_Block_SetDirty(block);
+        if ((bf_code = BF_UnpinBlock(block)) != BF_OK)
+            return HT_ERROR;
+        
+        BF_Block_SetDirty(block_0);
+    }
+    else { 
+        // Get Block
+        if ((bf_code = BF_GetBlock(indexDesc, s->block_num, block)) != BF_OK)
+            return HT_ERROR;
+        data = BF_Block_GetData(block);
+        pBInfo = data;
+        // Check if there is free space
+        if (pBInfo->num_records < FileInfo->max_records_per_bucket){ // There is free space
+            // Find place to insert record
+            data = pBInfo + 1;
+            prec = data;
+            prec[pBInfo->num_records] = record;
+            // Update Bucket Info
+            (pBInfo->num_records)++;
+            // Set dirty and Unpin
+            BF_Block_SetDirty(block);
+            if ((bf_code = BF_UnpinBlock(block)) != BF_OK)
+                return HT_ERROR;
+        }
+        else { // No free space
+            // Case 1: local_depth < global_depth -> No expansion
+            if (pBInfo->local_depth < FileInfo->global_depth){
+                // Store all records and re-Insert them
+                bucket_records = pBInfo->num_records + 1;
+                Record p_recs[pBInfo->num_records + 1];
+                data = pBInfo + 1;
+                // Copy records to p_recs
+                memcpy(p_recs, data, (pBInfo->num_records) * sizeof(record));
+                // Insert new record also
+                p_recs[pBInfo->num_records] = record;
+                // Create a new bucket
+                if ((bf_code = BF_AllocateBlock(indexDesc, new_block)) != BF_OK)
+                    return HT_ERROR;
+                // Update num_blocks
+                (FileInfo->num_blocks)++;
+                data = BF_Block_GetData(new_block);
+                // Update local depths
+                pBInfo->local_depth++;
+                new_pBinfo->local_depth = pBInfo->local_depth;
+                new_pBinfo->num_records = 0;
+                // Write new Bucket Info
+                new_pBinfo = data;
+                new_pBinfo[0] = BucketInfo;
+                pBInfo->num_records = 0;
+                // Set all dirty
+                BF_Block_SetDirty(block);
+                BF_Block_SetDirty(block_0);
+                BF_Block_SetDirty(new_block);
+
+                // Unpin block & new_block
+                if ((bf_code = BF_UnpinBlock(block)) != BF_OK)
+                    return HT_ERROR;
+                if ((bf_code == BF_UnpinBlock(new_block)) != BF_OK)
+                    return HT_ERROR;
+
+                // Update pointers to buckets
+                HT_SplitHashTable(HashTable, s->block_num, FileInfo->num_blocks-1);
+
+                // Re-insert all records recursively
+                for (i = 0; i < bucket_records; i++){
+                    if ((ht_code = HT_InsertEntry(indexDesc, HashTable, p_recs[i])) != HT_OK)
+                        return HT_ERROR;
+                }
+            }
+            else { // Case 2: Local_depth = Global_depth - Need to expand
+                // Store all records and re-Insert them
+                bucket_records = pBInfo->num_records + 1;
+                Record p_recs[pBInfo->num_records + 1];
+                data = pBInfo + 1;
+                // Copy records to p_recs
+                memcpy(p_recs, data, (pBInfo->num_records) * sizeof(record));
+                // Insert new record also
+                p_recs[pBInfo->num_records] = record;
+                // Create a new bucket
+                if ((bf_code = BF_AllocateBlock(indexDesc, new_block)) != BF_OK)
+                    return HT_ERROR;
+                // Update num_blocks
+                (FileInfo->num_blocks)++;
+                data = BF_Block_GetData(new_block);
+                // Update local depths
+                pBInfo->local_depth++;
+                new_pBinfo->local_depth = pBInfo->local_depth;
+                new_pBinfo->num_records = 0;
+                // Write new Bucket Info
+                new_pBinfo = data;
+                new_pBinfo[0] = BucketInfo;
+                pBInfo->num_records = 0;
+                // Increment global depth for expansion
+                FileInfo->global_depth++;
+
+                // Set dirty's
+                BF_Block_SetDirty(block);
+                BF_Block_SetDirty(new_block);
+                BF_Block_SetDirty(block_0);
+
+                // Unpin block & new_block
+                if ((bf_code = BF_UnpinBlock(block)) != BF_OK)
+                    return HT_ERROR;
+                if ((bf_code == BF_UnpinBlock(new_block)) != BF_OK)
+                    return HT_ERROR;
+
+                // Expand & Update
+                HT_ExpandHashTable(HashTable);
+                HT_UpdateHashTable(HashTable, FileInfo->global_depth);
+
+                // Re-insert all records recursively
+                for (i = 0; i < bucket_records; i++){
+                    if ((ht_code = HT_InsertEntry(indexDesc, HashTable, p_recs[i])) != HT_OK)
+                        return HT_ERROR;
+                }
+            }
+        }
+    }
+    // Destroy all blocks
+    BF_Block_Destroy(&block);
+    BF_Block_Destroy(&block_0);
+    BF_Block_Destroy(&new_block);
+
+    return HT_OK;
 }
 
 HT_ErrorCode HT_PrintAllEntries(int indexDesc, int *id) {
