@@ -80,7 +80,7 @@ int main(void){
         printf("Failed to open\n");
         return -1;
     }
-    printf("%d, %d, %d, %d\n", p->global_depth, p->max_nodes_per_block, p->num_node_blocks, p->num_blocks);
+    printf("%d, %d, %d, %d\n", p->global_depth, p->max_records_per_bucket, p->num_node_blocks, p->num_blocks);
 
     LList *root;
     if ((root = HT_HashTable_toList(fd1)) == NULL){
@@ -93,16 +93,18 @@ int main(void){
     Record record;
     srand(12569874);
     int r;
-    record.id = 123;
-    r = rand() % 12;
-    memcpy(record.name, names[r], strlen(names[r]) + 1);
-    r = rand() % 12;
-    memcpy(record.surname, surnames[r], strlen(surnames[r]) + 1);
-    r = rand() % 10;
-    memcpy(record.city, cities[r], strlen(cities[r]) + 1);
+    for (int id = 0; id < 17; ++id){
+      record.id = id;
+      r = rand() % 12;
+      memcpy(record.name, names[r], strlen(names[r]) + 1);
+      r = rand() % 12;
+      memcpy(record.surname, surnames[r], strlen(surnames[r]) + 1);
+      r = rand() % 10;
+      memcpy(record.city, cities[r], strlen(cities[r]) + 1);
 
-    if ((code1 = HT_InsertEntry(fd1, root, record)) != HT_OK)
-        return -1;
+      if ((code1 = HT_InsertEntry(fd1, root, record)) != HT_OK)
+          return -1;
+    }
     
     if ((code1 = BF_GetBlock(fd1, 2, block)) != BF_OK)
         return -1;
@@ -131,11 +133,13 @@ int main(void){
     // (root->next)->block_num = 123;
     // HT_PrintHashTable(root);
     // HT_ExpandHashTable(root);
-    // HT_UpdateHashTable(root, 1);
+    // HT_UpdateHashTable(root, 2);
     // printf("\n");
     // HT_PrintHashTable(root);
     // printf("ok!!\n");
     // LList *s;
+    // HT_ExpandHashTable(root);
+    // HT_UpdateHashTable(root, 3);
     // s = HT_GetHashTableBlockNum(root, 3);
     // printf("%d\n", s->block_num);
     // HT_SplitHashTable(root, 0, 22);

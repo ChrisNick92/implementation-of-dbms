@@ -9,3 +9,7 @@ bf:
 test:
 	@echo " Compile test ...";
 	gcc -I ./include/ -L ./lib/ -Wl,-rpath,./lib/ ./examples/test.c ./src/hash_file.c -lbf -o ./build/test.o -O2
+
+test_2:
+	@echo " Compile test ...";
+	gcc -I ./include/ -L ./lib/ -Wl,-rpath,./lib/ ./examples/test_2.c ./src/hash_file.c -lbf -o ./build/test_2.o -O2
