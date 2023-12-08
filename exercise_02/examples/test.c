@@ -6,6 +6,9 @@
 #include "bf.h"
 #include "hash_file.h"
 
+#define RECORDS_NUM 1000
+#define MAX_OPEN_FILES 20
+
 #define CALL_OR_DIE(call)     \
   {                           \
     HT_ErrorCode code = call; \
@@ -58,6 +61,7 @@ const char* cities[] = {
   "Miami"
 };
 
+int FILES[MAX_OPEN_FILES];
 
 int main(void){
     BF_Block *block;
@@ -72,8 +76,7 @@ int main(void){
     CALL_OR_DIE(BF_Init(LRU));
 
     if ((code1 = HT_CreateIndex("test.db", 1)) != HT_OK){
-        printf("Failed creating.\n");
-        return -1;
+        printf("Already exists!\n");
     }
     
     if ((p = HT_OpenIndex("test.db", &fd1)) == NULL){
@@ -87,63 +90,101 @@ int main(void){
         printf("Failed to conver to list!\n");
         return -1;
     }
-    HT_PrintHashTable(root);
 
     //Insert
     Record record;
-    srand(12569874);
-    int r;
-    for (int id = 0; id < 17; ++id){
-      record.id = id;
-      r = rand() % 12;
-      memcpy(record.name, names[r], strlen(names[r]) + 1);
-      r = rand() % 12;
-      memcpy(record.surname, surnames[r], strlen(surnames[r]) + 1);
-      r = rand() % 10;
-      memcpy(record.city, cities[r], strlen(cities[r]) + 1);
+    time_t t;
 
-      if ((code1 = HT_InsertEntry(fd1, root, record)) != HT_OK)
-          return -1;
+    srand(1231344);
+
+    int r;
+    for (int id = 0; id < RECORDS_NUM; id++){
+        record.id = id;
+        r = rand() % 12;
+        memcpy(record.name, names[r], strlen(names[r]) + 1);
+        r = rand() % 12;
+        memcpy(record.surname, surnames[r], strlen(surnames[r]) + 1);
+        r = rand() % 10;
+        memcpy(record.city, cities[r], strlen(cities[r]) + 1);
+        if ((code1 = HT_InsertEntry(fd1, root, record)) != HT_OK)
+            return -1;
     }
     
-    if ((code1 = BF_GetBlock(fd1, 2, block)) != BF_OK)
-        return -1;
-    data = BF_Block_GetData(block);
-    HT_BucketInfo *pBinfo;
-    pBinfo = data;
-    printf("%d, %d\n", pBinfo->local_depth, pBinfo->num_records);
-    data = pBinfo +1;
-    Record *prec;
-    prec=data;
-    printf("%s, %s, %d\n", prec->city, prec->name, prec->id);
+    // COMMENTS FOR SANITY CHECK
 
-    if ((code1 = BF_UnpinBlock(block)) != BF_OK)
-        return -1;
-    HT_PrintHashTable(root);
-    if ((code1 = HT_CloseFile(fd1)) != HT_OK){
+    // // Print Records for the first two blocks
+    // if ((code1 = BF_GetBlock(fd1, 2, block)) != BF_OK)
+    //     return -1;
+    // data = BF_Block_GetData(block);
+    // HT_BucketInfo *BInfo;
+    // BInfo = data;
+    // printf("Block 2: Records: %d Depth: %d\n", BInfo->num_records, BInfo->local_depth);
+    // data = BInfo + 1;
+    // Record *prec = data;
+    // for (int i = 0; i < BInfo->num_records; i++)
+    //     printf("id: %d\n", prec[i].id);
+    // if ((code1 = BF_UnpinBlock(block)) != BF_OK)
+    //     return -1;
+    
+    // if ((code1 = BF_GetBlock(fd1, 3, block)) != BF_OK)
+    //     return -1;
+    // data = BF_Block_GetData(block);
+    // BInfo = data;
+    // data = BInfo + 1;
+    // prec = data;
+    // printf("Block 3: Records: %d Depth: %d\n", BInfo->num_records, BInfo->local_depth);
+    // for (int i = 0; i < BInfo->num_records; i++)
+    //     printf("id: %d\n", prec[i].id);
+    
+    // if ((code1 = BF_UnpinBlock(block)) != BF_OK)
+    //     return -1;
+
+    // if ((code1 = BF_GetBlock(fd1, 4, block)) != BF_OK)
+    //     return -1;
+    // data = BF_Block_GetData(block);
+    // BInfo = data;
+    // data = BInfo + 1;
+    // prec = data;
+    // printf("Block 4: Records: %d Depth: %d\n", BInfo->num_records, BInfo->local_depth);
+    // for (int i = 0; i < BInfo->num_records; i++)
+    //     printf("id: %d\n", prec[i].id);
+    // if ((code1 = BF_UnpinBlock(block)) != BF_OK)
+    //     return -1;
+    
+    // Record p_recs[8];
+    // memcpy(p_recs, data, 8 * sizeof(rec));
+    // for (int i = 0; i < 8; i++)
+    //     printf("%d ", p_recs[i].id);
+    // printf("\n");
+
+    // printf("Before List to HashTable\n");
+    // HT_PrintHashTable(root);
+    // HT_PrintAllEntries(fd1, root, NULL);
+    // HashStatistics("test.db",root);
+
+    // HT_List_to_HashTable(fd1, root);
+    
+    // root =  HT_HashTable_toList(fd1);
+    // printf("After HashTable to List\n");
+    // HT_PrintHashTable(root);
+
+    // END COMMENTS FOR SANITY CHECK
+
+    printf("RUN PrintAllEntries\n");
+    int id = rand() % RECORDS_NUM;
+    CALL_OR_DIE(HT_PrintAllEntries(fd1, root, &id));
+
+    printf("RUN HashStatistics\n");
+    HashStatistics("test.db", root);
+
+
+    if ((code1 = HT_CloseFile(fd1, root)) != HT_OK){
         printf("Failed to close\n");
         return -1;
     }
 
     BF_Block_Destroy(&block);
     CALL_OR_DIE(BF_Close());
-
-    // LList *root;
-    // root = HT_LList_Init();
-    // (root->next)->block_num = 123;
-    // HT_PrintHashTable(root);
-    // HT_ExpandHashTable(root);
-    // HT_UpdateHashTable(root, 2);
-    // printf("\n");
-    // HT_PrintHashTable(root);
-    // printf("ok!!\n");
-    // LList *s;
-    // HT_ExpandHashTable(root);
-    // HT_UpdateHashTable(root, 3);
-    // s = HT_GetHashTableBlockNum(root, 3);
-    // printf("%d\n", s->block_num);
-    // HT_SplitHashTable(root, 0, 22);
-    // HT_PrintHashTable(root);
-
+    
     return 0;
 }

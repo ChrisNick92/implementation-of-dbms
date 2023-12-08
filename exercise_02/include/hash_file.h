@@ -1,5 +1,6 @@
 #ifndef HASH_FILE_H
 #define HASH_FILE_H
+#define HP_ERROR -1
 
 typedef enum HT_ErrorCode {
   HT_OK,
@@ -31,7 +32,7 @@ typedef struct LList
  * στα πρώτα m bits (least significant) του k.
  */
 
-int HT_HashFunc(int k, int n_total, int n_bits);
+int HT_HashFunc(int k, int n_bits);
 
 /*Η συνάρτηση LList_Init αρχικοποιεί τη διπλά συνδεδμένη λίστα.*/
 LList * HT_LList_Init(void);
@@ -76,6 +77,14 @@ LList *HT_HashTable_toList(int indexDesc);
  */
 LList * HT_GetHashTableBlockNum(LList * root, int n);
 
+HT_ErrorCode HT_GetBlockCounter(const int indexDesc, int *blocks_num);
+
+/*
+ *
+ */
+
+HT_ErrorCode HT_List_to_HashTable(int indexDesc, LList *root);
+
 /* Η δομή HT_FileInfo κρατάει πληροφορία για το αρχείο κατακερματισμού.
  * Η μεταβλητή hash_table_block_num δείχνει στο πρώτο block του ερευτηρίου.
  * Η μεταβλητή max_nodes_per_block αντιστοιχεί στο πόσα nodes του ερευτηρίου χωράει το ένα block
@@ -105,7 +114,6 @@ typedef struct HT_HashNodeInfo
 
 } HT_HashNodeInfo;
 
-
 HT_FileInfo * HT_GetFileInfo(int indexDesc);
 
 /* Δομή που κρατάει πληροφορία για τα buckets */
@@ -114,7 +122,6 @@ typedef struct HT_BucketInfo
     int local_depth;
     int num_records;
 } HT_BucketInfo;
-
 
 /*
  * Η συνάρτηση HT_Init χρησιμοποιείται για την αρχικοποίηση κάποιον δομών που μπορεί να χρειαστείτε. 
@@ -147,9 +154,7 @@ HT_FileInfo* HT_OpenIndex(
  * Επίσης σβήνει την καταχώρηση που αντιστοιχεί στο αρχείο αυτό στον πίνακα ανοιχτών αρχείων. 
  * Η συνάρτηση επιστρέφει ΗΤ_OK εάν το αρχείο κλείσει επιτυχώς, ενώ σε διαφορετική σε περίπτωση κωδικός λάθους.
  */
-HT_ErrorCode HT_CloseFile(
-	int indexDesc 		/* θέση στον πίνακα με τα ανοιχτά αρχεία */
-	);
+HT_ErrorCode HT_CloseFile(int indexDesc, LList *root);
 
 /*
  * Η συνάρτηση HT_InsertEntry χρησιμοποιείται για την εισαγωγή μίας εγγραφής στο αρχείο κατακερματισμού. 
@@ -169,8 +174,11 @@ HT_ErrorCode HT_InsertEntry(
  */
 HT_ErrorCode HT_PrintAllEntries(
 	int indexDesc,	/* θέση στον πίνακα με τα ανοιχτά αρχεία */
+    LList* HashTable,
 	int *id 				/* τιμή του πεδίου κλειδιού προς αναζήτηση */
 	);
 
+
+HT_ErrorCode HashStatistics(char* filename, LList *HashTable);
 
 #endif // HASH_FILE_H
