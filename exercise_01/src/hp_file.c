@@ -9,7 +9,7 @@
 #define CALL_BF(call)       \
 {                           \
   BF_ErrorCode code = call; \
-  if (code != BF_OK) {         \
+  if (code != BF_OK) {      \
     BF_PrintError(code);    \
     return HP_ERROR;        \
   }                         \
@@ -26,36 +26,29 @@ int HP_CreateFile(char *fileName){
     void *data;
     int blocks_num;
 
-    if ((code = BF_CreateFile(fileName)) != BF_OK)
-        return -1;
     // Create File
-    if ((code = BF_OpenFile(fileName, &fd)) != BF_OK) 
-        return -1;
+    CALL_BF(BF_CreateFile(fileName));
+
+
+    CALL_BF(BF_OpenFile(fileName, &fd));
+    
     BF_Block_Init(&block);
+
     // Initialize header info
-   
     p->total_block_recs = (BF_BLOCK_SIZE - sizeof(block_info)) / sizeof(rec);
     p->recorded_blocks = 0;
-    // Write on Block
-    if ((code = BF_AllocateBlock(fd, block)) != BF_OK){
-        BF_PrintError(code);
-        return -1;
-    }
-    // Write header on block
 
+    // Write on Block
+    CALL_BF(BF_AllocateBlock(fd, block));
+   
+    // Write header on block
     data = BF_Block_GetData(block);
     p = data;
     p[0] = hpInfo;
     BF_Block_SetDirty(block);
 
-    if ((code = BF_UnpinBlock(block)) != BF_OK){
-      BF_PrintError(code);
-      return -1;
-    }
-
     BF_Block_Destroy(&block);
     BF_CloseFile(fd);
-
     return 0;
 }
 
@@ -85,22 +78,13 @@ int HP_CloseFile(int file_desc, HP_info* hp_info ){
     BF_Block_Init(&block);
     BF_ErrorCode code;
 
-    if ((code = BF_GetBlock(file_desc, 0, block)) != BF_OK){
-        BF_PrintError(code);
-        return -1;
-    }
-
-    if ((code = BF_UnpinBlock(block)) != BF_OK){
-      BF_PrintError(code);
-      return -1;
-    }
+    CALL_BF(BF_GetBlock(file_desc, 0, block));
+    BF_Block_SetDirty(block);
+    CALL_BF(BF_UnpinBlock(block));
 
     BF_Block_Destroy(&block);
 
-    if ((code = BF_CloseFile(file_desc)) != BF_OK){
-      BF_PrintError(code);
-      return -1;
-    }
+    CALL_BF(BF_CloseFile(file_desc));
 
     return 0;
 }
@@ -168,66 +152,40 @@ int HP_InsertEntry(int file_desc, HP_info* hp_info, Record record){
     HP_block_info *block_info;
 
     current_block = hp_info->recorded_blocks; // Current Block to Insert Record
-
-    if ((code = BF_GetBlock(file_desc, current_block, block)) != BF_OK){
-        BF_PrintError(code);
-        return -1;
+    if(current_block != 0) {
+      CALL_BF(BF_GetBlock(file_desc, current_block, block));
+      rec = HP_GetNextBlockRecord(block, hp_info);
     }
-    rec = HP_GetNextBlockRecord(block, hp_info);
-
+    else {
+      rec = NULL;
+    }
     if (rec) {                              // If rec Not Null, then it has space to store record
         rec[0] = record;
         block_info = HP_AccessBlockInfo(block);
-        ++block_info->number_of_records;
-        BF_Block_SetDirty(block);
-
-        if ((code = BF_UnpinBlock(block)) != BF_OK){
-            BF_PrintError(code);
-            return -1;
-        }
-        else {
-            return 0;
-        }
     }
-    else { //Current block is full, need to write a new one
+    else {                                  //Current block is full, need to write a new one
         if(current_block != 0){
-          if ((code = BF_UnpinBlock(block)) != BF_OK){ //Unpin current block
-              BF_PrintError(code);
-              return -1;
-          }
+            CALL_BF(BF_UnpinBlock(block));          //Unpin current block
         }
-        if ((code = BF_AllocateBlock(file_desc, block)) != BF_OK){ // Initialize a new block
-            BF_PrintError(code);
-            return -1;
-        }
+        CALL_BF(BF_AllocateBlock(file_desc, block));    // Initialize a new block
         // Create Block Info and write record
         block_info = HP_AccessBlockInfo(block);
         block_info->number_of_records = 0;
         rec = HP_GetNextBlockRecord(block, hp_info);
         rec[0] = record;
-        ++block_info->number_of_records; // Inceremnt record number for this block
-        BF_Block_SetDirty(block);
         ++hp_info->recorded_blocks;
+    }
 
-        if ((code = BF_UnpinBlock(block)) != BF_OK){ //Unpin Block
-            BF_PrintError(code);
-            return -1;
-        }
-    }
-    if ((code = BF_GetBlock(file_desc, 0, block)) != BF_OK){
-        BF_PrintError(code);
-        return -1;
-    }
+    ++block_info->number_of_records; // Incerement record number for this block
     BF_Block_SetDirty(block);
-    if ((code = BF_UnpinBlock(block)) != BF_OK){
-      BF_PrintError(code);
-      return -1;
-    }
+    CALL_BF(BF_UnpinBlock(block));
+
     return 0;
 }
 
+
 int HP_GetAllEntries(int file_desc, HP_info* hp_info, int value){
-    int blocks_num,count_blocks = 0;
+    int blocks_num,count_blocks = 0,found =0;
     BF_ErrorCode code;
     BF_Block *block;
     BF_Block_Init(&block);
@@ -236,26 +194,22 @@ int HP_GetAllEntries(int file_desc, HP_info* hp_info, int value){
     if((code = BF_GetBlockCounter(file_desc, &blocks_num)) != BF_OK) return -1;
 
     for (int i = 1; i < blocks_num; ++i) {                  // Skip Block zero - Contains metadata
-       
-        if ((code = BF_GetBlock(file_desc, i, block)) != BF_OK){
-            BF_PrintError(code);
-            return -1;
-        }
+        CALL_BF(BF_GetBlock(file_desc, i, block));
         block_info = HP_AccessBlockInfo(block);
-        
+        count_blocks++;
         for (int j=1; j < block_info->number_of_records + 1; j++){
             
             rec = HP_GetBlockRecord(block, j);
             if (rec->id == value){
-                count_blocks++;
+                found = 1;
                 printRecord(*rec);
             }
-
         }
-        if ((code = BF_UnpinBlock(block)) != BF_OK){
-            BF_PrintError(code);
-            return -1;
-        }
-    }   
+        CALL_BF(BF_UnpinBlock(block));
+        
+    }
+    if(!found){
+        return -1;
+    }
     return count_blocks;
 }

@@ -3,35 +3,27 @@
 #include <record.h>
 
 
+#define HP_ERROR -1                     //used in CALL_BF in hp_file.c
 
-/* Η δομή HP_info κρατάει μεταδεδομένα που σχετίζονται με το αρχείο σωρού*/
-typedef struct {
-    int total_block_recs;               //capacity of 
-    int recorded_blocks;                
+//metadata of block 0
+typedef struct {        
+    int total_block_recs;               //records per block
+    int recorded_blocks;                //blocks that already contain records        
 } HP_info;
 
-typedef struct { // Block Info is placed at the beginning of the block
-    int number_of_records;
+typedef struct { 
+    int number_of_records;              //written records in a block
 } HP_block_info;
 
-/* H βοηθητική συνάρτηση HP_AccessBlockInfo γυρνάει έναν δείκτη
-στην αρχή του block που βρίσκονται τα μεταδεδομένα του block και
-είναι τύπου HP_block_info*. */
-HP_info* HP_AccessInfo(BF_Block *block);
-HP_block_info* HP_AccessBlockInfo(BF_Block *block);
+HP_info* HP_AccessInfo(BF_Block *);             
+HP_block_info* HP_AccessBlockInfo(BF_Block *);          //γυρνάει έναν δείκτη στην αρχή του block που βρίσκονται 
+                                                        //τα μεταδεδομένα του block
 
-/*Η βοηθητική συνάρτηση HP_GetNextBlockRecord γυρνάει ένα pointer
-τύπου record που δείχνει στην αρχή του που πρέπει να μπει το επόμενο
-record στο block, αν δεν υπάρχει χώρος επιστρέφει NULL */
-
-Record* HP_GetNextBlockRecord(BF_Block *block, HP_info *hpInfo);
-
-/*Η βοηθητική συνάρτηση HP_GetBlockRecord γυρνάει ένα pointer
-τύπου record που δείχνει στη θέση του record που ζητείται από τον
-χρήστη πάνω σε ένα συγκεκριμένο block. Aν ζητηθεί record που δεν
-είναι γραμμένο ή ξεπερνάει τα όρια τότε γυρνάει NULL. */
-
-Record *HP_GetBlockRecord(BF_Block *block, int record_num);
+Record* HP_GetNextBlockRecord(BF_Block *, HP_info *);   //γυρνάει ένα pointer που δείχνει στην αρχή που πρέπει 
+                                                        //να μπει το επόμενο διαθεσιμο record στο block, αν δεν χωράει επιστρέφει NULL
+                                    
+Record *HP_GetBlockRecord(BF_Block *, int);             //γυρνάει ένα pointer που δείχνει στη θέση του record που ζητείται από τον χρήστη
+                                                        //σε ένα block. Aν δεν είναι γραμμένο ή ξεπερνάει τα όρια, γυρνάει NULL.            
 
 
 /*Η συνάρτηση HP_CreateFile χρησιμοποιείται για τη δημιουργία και
